@@ -39,6 +39,8 @@
 - JWT для внутренних сервисов с коротким сроком жизни токенов
 - API Keys для партнерских/публичных API с ротацией ключей
 - Регулярный аудит безопасности
+- Токены в производственной среде хранятся в куках с флагом `httpOnly=true`
+- Токены в dev-среде хранятся в куках с флагом `httpOnly=false` для обеспечения работы инструментов автоматизации
 
 ### Производительность
 - Пагинация обязательна для коллекций более 100 элементов
@@ -52,6 +54,13 @@
 - Protocol Buffers для gRPC
 - Автоматическая генерация документации из кода
 - Примеры использования для каждого эндпоинта
+
+### Автоматизация соблюдения стандарта
+- Обязательное использование инструмента Spectral (Stoplight.io) для статического анализа и контроля API-контрактов
+- Интеграция проверок в CI/CD-пайплайн с блокировкой мержа при нарушении стандарта
+- Автоматическая валидация спецификаций перед деплоем
+- Автоматизированные тесты на соответствие API-контракту
+- Регулярные автоматические аудиты существующих API
 
 ## 3. Проектирование API
 
@@ -124,7 +133,7 @@
 - JWT для внутренних сервисов с коротким TTL (максимум 1 час)
 - Централизованное управление токенами через Identity Provider
 - API Key + Secret для партнерских интеграций
-- Все токены передаются в заголовке `Authorization`
+- Все токены передаются в заголовке `Authorization` или в куках с соответствующими настройками безопасности
 
 #### Лимиты запросов
 - Каждый эндпоинт должен иметь определенные лимиты запросов
@@ -283,7 +292,8 @@
 
 ### CI/CD для API
 - Автоматическая сборка и тестирование при каждом коммите
-- Линтинг кода и спецификаций API
+- Линтинг кода и спецификаций API с помощью Spectral
+- Автоматическая валидация спецификаций OpenAPI
 - Автоматическая публикация документации
 - Голубой/зеленый деплой для нулевого простоя
 - Канарейный релиз для новых версий API
@@ -465,6 +475,31 @@ security:
   - BearerAuth: []
 ```
 
+### Пример правил Spectral для валидации API
+
+```yaml
+extends: spectral:oas
+rules:
+  operation-tags: error
+  operation-description: error
+  operation-success-response: error
+  no-unused-components: error
+  openapi-tags: error
+  paths-kebab-case: error
+  typed-enum: error
+  response-contains-example: warn
+  info-contact: error
+  oas3-schema: error
+  security-defined: error
+  pagination-style:
+    description: API должен использовать курсорную пагинацию или offset/limit
+    message: Пагинация должна использовать параметры cursor/limit или offset/limit
+    given: $.paths..parameters[?(@.name == "page")]
+    severity: error
+    then:
+      function: falsy
+```
+
 ## 9. Приложения
 
 ### Глоссарий
@@ -480,30 +515,7 @@ security:
 - **Idempotent** - Операция, которую можно повторять без дополнительных эффектов
 - **Rate Limiting** - Ограничение частоты запросов
 - **CI/CD** - Continuous Integration/Continuous Deployment
-
-### Ссылки на инструменты
-
-- **Документация API**:
-  - [Swagger UI](https://swagger.io/tools/swagger-ui/)
-  - [ReDoc](https://github.com/Redocly/redoc)
-  - [Stoplight](https://stoplight.io/)
-
-- **Разработка и тестирование**:
-  - [Postman](https://www.postman.com/)
-  - [Insomnia](https://insomnia.rest/)
-  - [Newman](https://github.com/postmanlabs/newman)
-
-- **API Gateway**:
-  - [Kong](https://konghq.com/)
-  - [Apigee](https://cloud.google.com/apigee)
-  - [AWS API Gateway](https://aws.amazon.com/api-gateway/)
-
-- **Мониторинг и аналитика**:
-  - [Datadog](https://www.datadoghq.com/)
-  - [Prometheus](https://prometheus.io/)
-  - [Grafana](https://grafana.com/)
-  - [ELK Stack](https://www.elastic.co/what-is/elk-stack)
-  - [Jaeger](https://www.jaegertracing.io/)
+- **Spectral** - Инструмент для линтинга и проверки API-контрактов
 
 ### Чеклист для Code Review API
 
@@ -519,6 +531,7 @@ security:
 - [ ] Валидируются входные данные
 - [ ] Защита от инъекций и атак
 - [ ] Чувствительные данные не передаются в открытом виде
+- [ ] Правильная настройка флагов безопасности для кук в зависимости от окружения
 
 #### Производительность
 - [ ] Реализована пагинация для коллекций
@@ -542,6 +555,11 @@ security:
 - [ ] Версия API отражена в пути
 - [ ] Обеспечена обратная совместимость в пределах версии
 - [ ] Новые поля добавляются не нарушая совместимости
+
+#### Автоматизация
+- [ ] Spectral-правила настроены и интегрированы в CI/CD
+- [ ] API проходит все проверки Spectral без ошибок
+- [ ] Настроены автотесты на соответствие API-контракту
 
 #### Тестирование
 - [ ] Написаны unit-тесты
